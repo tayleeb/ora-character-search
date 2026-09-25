@@ -1,0 +1,12 @@
+{
+  "name": "ora-character-search",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Public Roblox username search proxy for ORA's character list",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
