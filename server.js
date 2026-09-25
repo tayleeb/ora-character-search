@@ -38,24 +38,29 @@ async function searchRobloxUsers(query) {
   const cached = cache.get(key);
   if (cached && Date.now() - cached.createdAt < CACHE_MS) return cached.results;
 
-  const endpoint = new URL("https://users.roblox.com/v1/users/search");
-  endpoint.searchParams.set("keyword", query);
-  endpoint.searchParams.set("limit", String(MAX_RESULTS));
+  async function getPage(cursor) {
+    const endpoint = new URL("https://users.roblox.com/v1/users/search");
+    endpoint.searchParams.set("keyword", query);
+    // Roblox caps this endpoint at ten results per page.
+    endpoint.searchParams.set("limit", "10");
+    if (cursor) endpoint.searchParams.set("cursor", cursor);
 
-  const upstream = await fetch(endpoint, {
-    headers: { "User-Agent": "ORA-Character-Search/1.0" },
-    signal: AbortSignal.timeout(8_000),
-  });
-  if (!upstream.ok) throw new Error(`Roblox returned ${upstream.status}`);
+    const upstream = await fetch(endpoint, {
+      headers: { "User-Agent": "ORA-Character-Search/1.0" },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!upstream.ok) throw new Error(`Roblox returned ${upstream.status}`);
+    return upstream.json();
+  }
 
-  const payload = await upstream.json();
-  const results = Array.isArray(payload.data)
-    ? payload.data.slice(0, MAX_RESULTS).map((user) => ({
-        UserId: user.id,
-        Username: user.name,
-        DisplayName: user.displayName || user.name,
-      }))
-    : [];
+  const firstPage = await getPage();
+  const secondPage = firstPage.nextPageCursor ? await getPage(firstPage.nextPageCursor) : { data: [] };
+  const results = [...(firstPage.data || []), ...(secondPage.data || [])]
+    .slice(0, MAX_RESULTS).map((user) => ({
+      UserId: user.id,
+      Username: user.name,
+      DisplayName: user.displayName || user.name,
+    }));
 
   cache.set(key, { createdAt: Date.now(), results });
   return results;
